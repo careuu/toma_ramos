@@ -8,8 +8,8 @@ const state = {
   hoveredSection: null, // { courseCode, section }
   hoveredAssistant: null, // assistantOption
   currentStep: 1, // 1: Toma de Ramos, 2: Postulación de Ayudantías de Lab, 3: Postulación de Ayudantías de Ciencias Básicas
-  expandedSemesters: { 1: true }, // Default Semester 1 expanded
-  selectedSemester: 1, // Default active semester
+  expandedSemesters: {}, // All semesters collapsed by default
+  selectedSemester: 'all', // Default to showing all semesters on initial page load
   isSemestersExpanded: false, // Semesters accordion state
   filters: {
     clash: false,
@@ -622,7 +622,11 @@ function renderCourseList() {
 
     const activeBadge = document.createElement('span');
     activeBadge.className = 'semesters-selector-current-badge';
-    activeBadge.innerText = state.selectedSemester === 11 ? 'Titulamiento' : `Semestre ${state.selectedSemester}`;
+    if (state.selectedSemester === 'all') {
+      activeBadge.innerText = 'Todos';
+    } else {
+      activeBadge.innerText = state.selectedSemester === 11 ? 'Titulamiento' : `Semestre ${state.selectedSemester}`;
+    }
     headerRightArea.appendChild(activeBadge);
 
     const arrowIcon = document.createElement('span');
@@ -637,6 +641,31 @@ function renderCourseList() {
     if (state.isSemestersExpanded) {
       const optionsContainer = document.createElement('div');
       optionsContainer.className = 'semesters-selector-options';
+
+      // Option "Todos los semestres"
+      const todosOption = document.createElement('div');
+      todosOption.className = 'semester-option';
+      todosOption.style.gridColumn = 'span 2';
+      if (state.selectedSemester === 'all') {
+        todosOption.classList.add('selected');
+      }
+
+      const todosLabel = document.createElement('span');
+      todosLabel.innerText = 'Todos los ramos';
+      todosOption.appendChild(todosLabel);
+
+      const todosBadge = document.createElement('span');
+      todosBadge.className = 'semester-option-count-badge';
+      todosBadge.innerText = filtered.length;
+      todosOption.appendChild(todosBadge);
+
+      todosOption.onclick = (e) => {
+        e.stopPropagation();
+        state.selectedSemester = 'all';
+        state.isSemestersExpanded = false;
+        renderCourseList();
+      };
+      optionsContainer.appendChild(todosOption);
 
       for (let semIdx = 1; semIdx <= 11; semIdx++) {
         // Count courses of this semester matching active filters
@@ -674,399 +703,236 @@ function renderCourseList() {
     // 2. Render Active Semester Title Divider
     const activeTitle = document.createElement('div');
     activeTitle.className = 'active-semester-title';
-    activeTitle.innerHTML = `<h3>Ramos de ${state.selectedSemester === 11 ? 'Titulamiento / Examen' : 'Semestre ' + state.selectedSemester}</h3>`;
+    if (state.selectedSemester === 'all') {
+      activeTitle.innerHTML = '<h3>Todos los Ramos</h3>';
+    } else {
+      activeTitle.innerHTML = `<h3>Ramos de ${state.selectedSemester === 11 ? 'Titulamiento / Examen' : 'Semestre ' + state.selectedSemester}</h3>`;
+    }
     container.appendChild(activeTitle);
 
-    // 3. Render courses for the selected semester directly
-    const semCourses = coursesBySemester[state.selectedSemester] || [];
-    if (semCourses.length === 0) {
-      const noCoursesDiv = document.createElement('div');
-      noCoursesDiv.className = 'no-results-inner';
-      noCoursesDiv.style.padding = '2rem 1rem';
-      noCoursesDiv.style.textAlign = 'center';
-      noCoursesDiv.style.color = 'var(--text-muted)';
-      noCoursesDiv.innerHTML = `
-        <span class="material-symbols-outlined" style="font-size: 2.5rem; margin-bottom: 0.5rem;">search_off</span>
-        <p style="font-size: 0.85rem;">No hay ramos seleccionables en este semestre para los filtros actuales.</p>
-      `;
-      container.appendChild(noCoursesDiv);
+    // 3. Gather courses to render (flat list, ordered by semester)
+    let coursesToRender = [];
+    if (state.selectedSemester === 'all') {
+      for (let i = 1; i <= 11; i++) {
+        coursesToRender.push(...coursesBySemester[i]);
+      }
     } else {
-      const coursesContainer = document.createElement('div');
-      coursesContainer.className = 'semester-courses';
-      coursesContainer.style.display = 'flex'; // Ensure displayed
-
-      semCourses.forEach(course => {
-        const isSelected = !!state.selectedSections[course.code];
-        const selectedSec = state.selectedSections[course.code];
-
-        const card = document.createElement('div');
-        card.className = 'course-card';
-        card.dataset.code = course.code;
-        if (isSelected) card.classList.add('has-selected');
-        if (course.code === activeCode) card.classList.add('active');
-
-        // Course Header
-        const header = document.createElement('div');
-        header.className = 'course-header';
-        header.onclick = () => toggleCourseCard(card);
-
-        const leftInfo = document.createElement('div');
-        leftInfo.className = 'course-header-left';
-
-        const codeSpan = document.createElement('span');
-        codeSpan.className = 'course-code';
-        codeSpan.innerText = course.code;
-
-        if (isSelected) {
-          const dot = document.createElement('span');
-          dot.className = 'material-symbols-outlined';
-          dot.style.fontSize = '0.8rem';
-          dot.style.color = 'var(--primary)';
-          dot.innerText = 'check_circle';
-          codeSpan.appendChild(dot);
-        }
-        leftInfo.appendChild(codeSpan);
-
-        const titleSpan = document.createElement('span');
-        titleSpan.className = 'course-title';
-        titleSpan.innerText = course.name;
-        leftInfo.appendChild(titleSpan);
-
-        const rightInfo = document.createElement('div');
-        rightInfo.className = 'course-header-right';
-
-        const creditsSpan = document.createElement('span');
-        creditsSpan.className = 'course-credits';
-        creditsSpan.innerText = `${course.credits} Cr`;
-        rightInfo.appendChild(creditsSpan);
-
-        const arrow = document.createElement('span');
-        arrow.className = 'material-symbols-outlined toggle-arrow';
-        arrow.innerText = 'expand_more';
-        rightInfo.appendChild(arrow);
-
-        header.appendChild(leftInfo);
-        header.appendChild(rightInfo);
-        card.appendChild(header);
-
-        // Course Sections Accordion Panel
-        const sectionsContainer = document.createElement('div');
-        sectionsContainer.className = 'course-sections';
-
-        course.sections.forEach(sec => {
-          const isSecSelected = selectedSec && selectedSec.section === sec.section;
-
-          const clashesWithOthers = Object.entries(state.selectedSections).some(([selCode, selSec]) => {
-            if (selCode === course.code) return false;
-            return sectionsClash(sec, selSec);
-          });
-
-          const secCard = document.createElement('div');
-          secCard.className = 'section-card';
-          if (isSecSelected) secCard.classList.add('selected');
-          if (clashesWithOthers) secCard.classList.add('clashing');
-
-          const topRow = document.createElement('div');
-          topRow.className = 'section-top-row';
-
-          const secName = document.createElement('span');
-          secName.className = 'section-name';
-          secName.innerText = sec.section;
-          topRow.appendChild(secName);
-
-          const checkMarker = document.createElement('div');
-          checkMarker.className = 'section-check';
-          const checkIcon = document.createElement('span');
-          checkIcon.className = 'material-symbols-outlined';
-          checkIcon.innerText = 'check';
-          checkMarker.appendChild(checkIcon);
-          topRow.appendChild(checkMarker);
-
-          secCard.appendChild(topRow);
-
-          const prof = document.createElement('div');
-          prof.className = 'section-professor';
-          prof.innerText = sec.professor || 'Profesor Por Designar';
-          secCard.appendChild(prof);
-
-          const metaRow = document.createElement('div');
-          metaRow.className = 'section-meta-row';
-
-          const vacItem = document.createElement('div');
-          vacItem.className = 'section-meta-item';
-          const vacIcon = document.createElement('span');
-          vacIcon.className = 'material-symbols-outlined';
-          vacIcon.innerText = 'group';
-          vacItem.appendChild(vacIcon);
-          vacItem.appendChild(document.createTextNode(` Vac: ${sec.vacancies}`));
-          metaRow.appendChild(vacItem);
-
-          if (sec.package) {
-            const pkgItem = document.createElement('div');
-            pkgItem.className = 'section-meta-item';
-            const pkgIcon = document.createElement('span');
-            pkgIcon.className = 'material-symbols-outlined';
-            pkgIcon.innerText = 'inventory_2';
-            pkgItem.appendChild(pkgIcon);
-
-            let pkgName = sec.package;
-            if (pkgName.length > 15) pkgName = pkgName.substring(0, 12) + '...';
-            pkgItem.appendChild(document.createTextNode(` Pq: ${pkgName}`));
-            pkgItem.title = `Paquete: ${sec.package}`;
-            metaRow.appendChild(pkgItem);
-          }
-
-          secCard.appendChild(metaRow);
-
-          const schedDiv = document.createElement('div');
-          schedDiv.className = 'section-schedules';
-          sec.events.forEach(ev => {
-            const row = document.createElement('div');
-            row.className = 'schedule-row';
-
-            const typeBadge = document.createElement('span');
-            typeBadge.className = 'schedule-type';
-            typeBadge.innerText = ev.type.includes('AYUD') ? 'Ayud' : (ev.type.includes('CÁTE') ? 'Cát' : 'Lab');
-            row.appendChild(typeBadge);
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'schedule-time';
-            timeSpan.innerText = ev.schedule_raw;
-            row.appendChild(timeSpan);
-
-            schedDiv.appendChild(row);
-          });
-          secCard.appendChild(schedDiv);
-
-          secCard.onclick = (e) => {
-            e.stopPropagation();
-            selectSection(course.code, sec);
-          };
-
-          secCard.onmouseenter = () => {
-            state.hoveredSection = { courseCode: course.code, section: sec };
-            renderCalendar();
-          };
-
-          secCard.onmouseleave = () => {
-            state.hoveredSection = null;
-            renderCalendar();
-          };
-
-          sectionsContainer.appendChild(secCard);
-        });
-
-        card.appendChild(sectionsContainer);
-        coursesContainer.appendChild(card);
-      });
-
-      container.appendChild(coursesContainer);
+      coursesToRender = coursesBySemester[state.selectedSemester] || [];
     }
+
+    renderCoursesFlat(coursesToRender, container, activeCode);
   } else {
-    // 4. Render Grouped Semesters when search is active
-    for (let semIdx = 1; semIdx <= 11; semIdx++) {
-      const semCourses = coursesBySemester[semIdx];
-      if (semCourses.length === 0) continue; // Skip semesters with no courses matching the filter
+    // 4. Render Active Semester Title Divider for Search
+    const activeTitle = document.createElement('div');
+    activeTitle.className = 'active-semester-title';
+    activeTitle.innerHTML = '<h3>Resultados de Búsqueda</h3>';
+    container.appendChild(activeTitle);
 
-      // Create Semester Group
-      const semGroup = document.createElement('div');
-      semGroup.className = 'semester-group';
-      semGroup.classList.add('expanded'); // Auto-expand matching semesters in search mode
+    // 5. Gather all search matching courses sorted by semester
+    const coursesToRender = [];
+    for (let i = 1; i <= 11; i++) {
+      coursesToRender.push(...coursesBySemester[i]);
+    }
 
-      // Create Semester Header
-      const semHeader = document.createElement('div');
-      semHeader.className = 'semester-header';
-      semHeader.style.cursor = 'default';
+    renderCoursesFlat(coursesToRender, container, activeCode);
+  }
+}
 
-      const titleArea = document.createElement('div');
-      titleArea.className = 'semester-header-title';
+// Helper to render courses flatly in the list
+function renderCoursesFlat(courses, container, activeCode) {
+  if (courses.length === 0) {
+    const noCoursesDiv = document.createElement('div');
+    noCoursesDiv.className = 'no-results-inner';
+    noCoursesDiv.style.padding = '2rem 1rem';
+    noCoursesDiv.style.textAlign = 'center';
+    noCoursesDiv.style.color = 'var(--text-muted)';
+    noCoursesDiv.innerHTML = `
+      <span class="material-symbols-outlined" style="font-size: 2.5rem; margin-bottom: 0.5rem;">search_off</span>
+      <p style="font-size: 0.85rem;">No hay ramos seleccionables para los filtros actuales.</p>
+    `;
+    container.appendChild(noCoursesDiv);
+    return;
+  }
 
-      const titleText = document.createElement('span');
-      titleText.innerText = semIdx === 11 ? 'Titulamiento / Examen' : `Semestre ${semIdx}`;
-      titleArea.appendChild(titleText);
+  const coursesContainer = document.createElement('div');
+  coursesContainer.className = 'semester-courses';
+  coursesContainer.style.display = 'flex'; // Ensure displayed
 
-      const badge = document.createElement('span');
-      badge.className = 'semester-badge';
-      badge.innerText = `${semCourses.length} ${semCourses.length === 1 ? 'ramo' : 'ramos'}`;
-      titleArea.appendChild(badge);
+  courses.forEach(course => {
+    const isSelected = !!state.selectedSections[course.code];
+    const selectedSec = state.selectedSections[course.code];
 
-      semHeader.appendChild(titleArea);
-      semGroup.appendChild(semHeader);
+    const card = document.createElement('div');
+    card.className = 'course-card';
+    card.dataset.code = course.code;
+    if (isSelected) card.classList.add('has-selected');
+    if (course.code === activeCode) card.classList.add('active');
 
-      // Semester Courses Container
-      const coursesContainer = document.createElement('div');
-      coursesContainer.className = 'semester-courses';
-      coursesContainer.style.display = 'flex'; // Ensure flex layout
+    // Course Header
+    const header = document.createElement('div');
+    header.className = 'course-header';
+    header.onclick = () => toggleCourseCard(card);
 
-      semCourses.forEach(course => {
-        const isSelected = !!state.selectedSections[course.code];
-        const selectedSec = state.selectedSections[course.code];
+    const leftInfo = document.createElement('div');
+    leftInfo.className = 'course-header-left';
 
-        const card = document.createElement('div');
-        card.className = 'course-card';
-        card.dataset.code = course.code;
-        if (isSelected) card.classList.add('has-selected');
-        if (course.code === activeCode) card.classList.add('active');
+    const codeSpan = document.createElement('span');
+    codeSpan.className = 'course-code';
+    codeSpan.innerText = course.code;
 
-        // Course Header
-        const header = document.createElement('div');
-        header.className = 'course-header';
-        header.onclick = () => toggleCourseCard(card);
+    if (isSelected) {
+      const dot = document.createElement('span');
+      dot.className = 'material-symbols-outlined';
+      dot.style.fontSize = '0.8rem';
+      dot.style.color = 'var(--primary)';
+      dot.innerText = 'check_circle';
+      codeSpan.appendChild(dot);
+    }
+    leftInfo.appendChild(codeSpan);
 
-        const leftInfo = document.createElement('div');
-        leftInfo.className = 'course-header-left';
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'course-title';
+    titleSpan.innerText = course.name;
+    leftInfo.appendChild(titleSpan);
 
-        const codeSpan = document.createElement('span');
-        codeSpan.className = 'course-code';
-        codeSpan.innerText = course.code;
+    const rightInfo = document.createElement('div');
+    rightInfo.className = 'course-header-right';
 
-        if (isSelected) {
-          const dot = document.createElement('span');
-          dot.className = 'material-symbols-outlined';
-          dot.style.fontSize = '0.8rem';
-          dot.style.color = 'var(--primary)';
-          dot.innerText = 'check_circle';
-          codeSpan.appendChild(dot);
-        }
-        leftInfo.appendChild(codeSpan);
+    // Show a semester badge if we are displaying all semesters or search is active
+    const isSearchActive = state.filters.query.trim().length > 0;
+    if (state.selectedSemester === 'all' || isSearchActive) {
+      const semBadge = document.createElement('span');
+      semBadge.className = 'course-semester-tag';
+      semBadge.innerText = course.semester === 11 ? 'Titulamiento' : `Sem ${course.semester}`;
+      rightInfo.appendChild(semBadge);
+    }
 
-        const titleSpan = document.createElement('span');
-        titleSpan.className = 'course-title';
-        titleSpan.innerText = course.name;
-        leftInfo.appendChild(titleSpan);
+    const creditsSpan = document.createElement('span');
+    creditsSpan.className = 'course-credits';
+    creditsSpan.innerText = `${course.credits} Cr`;
+    rightInfo.appendChild(creditsSpan);
 
-        const rightInfo = document.createElement('div');
-        rightInfo.className = 'course-header-right';
+    const arrow = document.createElement('span');
+    arrow.className = 'material-symbols-outlined toggle-arrow';
+    arrow.innerText = 'expand_more';
+    rightInfo.appendChild(arrow);
 
-        const creditsSpan = document.createElement('span');
-        creditsSpan.className = 'course-credits';
-        creditsSpan.innerText = `${course.credits} Cr`;
-        rightInfo.appendChild(creditsSpan);
+    header.appendChild(leftInfo);
+    header.appendChild(rightInfo);
+    card.appendChild(header);
 
-        const arrow = document.createElement('span');
-        arrow.className = 'material-symbols-outlined toggle-arrow';
-        arrow.innerText = 'expand_more';
-        rightInfo.appendChild(arrow);
+    // Course Sections Accordion Panel
+    const sectionsContainer = document.createElement('div');
+    sectionsContainer.className = 'course-sections';
 
-        header.appendChild(leftInfo);
-        header.appendChild(rightInfo);
-        card.appendChild(header);
+    course.sections.forEach(sec => {
+      const isSecSelected = selectedSec && selectedSec.section === sec.section;
 
-        // Course Sections Accordion Panel
-        const sectionsContainer = document.createElement('div');
-        sectionsContainer.className = 'course-sections';
-
-        course.sections.forEach(sec => {
-          const isSecSelected = selectedSec && selectedSec.section === sec.section;
-
-          const clashesWithOthers = Object.entries(state.selectedSections).some(([selCode, selSec]) => {
-            if (selCode === course.code) return false;
-            return sectionsClash(sec, selSec);
-          });
-
-          const secCard = document.createElement('div');
-          secCard.className = 'section-card';
-          if (isSecSelected) secCard.classList.add('selected');
-          if (clashesWithOthers) secCard.classList.add('clashing');
-
-          const topRow = document.createElement('div');
-          topRow.className = 'section-top-row';
-
-          const secName = document.createElement('span');
-          secName.className = 'section-name';
-          secName.innerText = sec.section;
-          topRow.appendChild(secName);
-
-          const checkMarker = document.createElement('div');
-          checkMarker.className = 'section-check';
-          const checkIcon = document.createElement('span');
-          checkIcon.className = 'material-symbols-outlined';
-          checkIcon.innerText = 'check';
-          checkMarker.appendChild(checkIcon);
-          topRow.appendChild(checkMarker);
-
-          secCard.appendChild(topRow);
-
-          const prof = document.createElement('div');
-          prof.className = 'section-professor';
-          prof.innerText = sec.professor || 'Profesor Por Designar';
-          secCard.appendChild(prof);
-
-          const metaRow = document.createElement('div');
-          metaRow.className = 'section-meta-row';
-
-          const vacItem = document.createElement('div');
-          vacItem.className = 'section-meta-item';
-          const vacIcon = document.createElement('span');
-          vacIcon.className = 'material-symbols-outlined';
-          vacIcon.innerText = 'group';
-          vacItem.appendChild(vacIcon);
-          vacItem.appendChild(document.createTextNode(` Vac: ${sec.vacancies}`));
-          metaRow.appendChild(vacItem);
-
-          if (sec.package) {
-            const pkgItem = document.createElement('div');
-            pkgItem.className = 'section-meta-item';
-            const pkgIcon = document.createElement('span');
-            pkgIcon.className = 'material-symbols-outlined';
-            pkgIcon.innerText = 'inventory_2';
-            pkgItem.appendChild(pkgIcon);
-
-            let pkgName = sec.package;
-            if (pkgName.length > 15) pkgName = pkgName.substring(0, 12) + '...';
-            pkgItem.appendChild(document.createTextNode(` Pq: ${pkgName}`));
-            pkgItem.title = `Paquete: ${sec.package}`;
-            metaRow.appendChild(pkgItem);
-          }
-
-          secCard.appendChild(metaRow);
-
-          const schedDiv = document.createElement('div');
-          schedDiv.className = 'section-schedules';
-          sec.events.forEach(ev => {
-            const row = document.createElement('div');
-            row.className = 'schedule-row';
-
-            const typeBadge = document.createElement('span');
-            typeBadge.className = 'schedule-type';
-            typeBadge.innerText = ev.type.includes('AYUD') ? 'Ayud' : (ev.type.includes('CÁTE') ? 'Cát' : 'Lab');
-            row.appendChild(typeBadge);
-
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'schedule-time';
-            timeSpan.innerText = ev.schedule_raw;
-            row.appendChild(timeSpan);
-
-            schedDiv.appendChild(row);
-          });
-          secCard.appendChild(schedDiv);
-
-          secCard.onclick = (e) => {
-            e.stopPropagation();
-            selectSection(course.code, sec);
-          };
-
-          secCard.onmouseenter = () => {
-            state.hoveredSection = { courseCode: course.code, section: sec };
-            renderCalendar();
-          };
-
-          secCard.onmouseleave = () => {
-            state.hoveredSection = null;
-            renderCalendar();
-          };
-
-          sectionsContainer.appendChild(secCard);
-        });
-
-        card.appendChild(sectionsContainer);
-        coursesContainer.appendChild(card);
+      const clashesWithOthers = Object.entries(state.selectedSections).some(([selCode, selSec]) => {
+        if (selCode === course.code) return false;
+        return sectionsClash(sec, selSec);
       });
 
-      semGroup.appendChild(coursesContainer);
-      container.appendChild(semGroup);
-    }
-  }
+      const secCard = document.createElement('div');
+      secCard.className = 'section-card';
+      if (isSecSelected) secCard.classList.add('selected');
+      if (clashesWithOthers) secCard.classList.add('clashing');
+
+      const topRow = document.createElement('div');
+      topRow.className = 'section-top-row';
+
+      const secName = document.createElement('span');
+      secName.className = 'section-name';
+      secName.innerText = sec.section;
+      topRow.appendChild(secName);
+
+      const checkMarker = document.createElement('div');
+      checkMarker.className = 'section-check';
+      const checkIcon = document.createElement('span');
+      checkIcon.className = 'material-symbols-outlined';
+      checkIcon.innerText = 'check';
+      checkMarker.appendChild(checkIcon);
+      topRow.appendChild(checkMarker);
+
+      secCard.appendChild(topRow);
+
+      const prof = document.createElement('div');
+      prof.className = 'section-professor';
+      prof.innerText = sec.professor || 'Profesor Por Designar';
+      secCard.appendChild(prof);
+
+      const metaRow = document.createElement('div');
+      metaRow.className = 'section-meta-row';
+
+      const vacItem = document.createElement('div');
+      vacItem.className = 'section-meta-item';
+      const vacIcon = document.createElement('span');
+      vacIcon.className = 'material-symbols-outlined';
+      vacIcon.innerText = 'group';
+      vacItem.appendChild(vacIcon);
+      vacItem.appendChild(document.createTextNode(` Vac: ${sec.vacancies}`));
+      metaRow.appendChild(vacItem);
+
+      if (sec.package) {
+        const pkgItem = document.createElement('div');
+        pkgItem.className = 'section-meta-item';
+        const pkgIcon = document.createElement('span');
+        pkgIcon.className = 'material-symbols-outlined';
+        pkgIcon.innerText = 'inventory_2';
+        pkgItem.appendChild(pkgIcon);
+
+        let pkgName = sec.package;
+        if (pkgName.length > 15) pkgName = pkgName.substring(0, 12) + '...';
+        pkgItem.appendChild(document.createTextNode(` Pq: ${pkgName}`));
+        pkgItem.title = `Paquete: ${sec.package}`;
+        metaRow.appendChild(pkgItem);
+      }
+
+      secCard.appendChild(metaRow);
+
+      const schedDiv = document.createElement('div');
+      schedDiv.className = 'section-schedules';
+      sec.events.forEach(ev => {
+        const row = document.createElement('div');
+        row.className = 'schedule-row';
+
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'schedule-type';
+        typeBadge.innerText = ev.type.includes('AYUD') ? 'Ayud' : (ev.type.includes('CÁTE') ? 'Cát' : 'Lab');
+        row.appendChild(typeBadge);
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'schedule-time';
+        timeSpan.innerText = ev.schedule_raw;
+        row.appendChild(timeSpan);
+
+        schedDiv.appendChild(row);
+      });
+      secCard.appendChild(schedDiv);
+
+      secCard.onclick = (e) => {
+        e.stopPropagation();
+        selectSection(course.code, sec);
+      };
+
+      secCard.onmouseenter = () => {
+        state.hoveredSection = { courseCode: course.code, section: sec };
+        renderCalendar();
+      };
+
+      secCard.onmouseleave = () => {
+        state.hoveredSection = null;
+        renderCalendar();
+      };
+
+      sectionsContainer.appendChild(secCard);
+    });
+
+    card.appendChild(sectionsContainer);
+    coursesContainer.appendChild(card);
+  });
+
+  container.appendChild(coursesContainer);
 }
 
 // Print/PDF Handler
@@ -1079,14 +945,35 @@ function setupExport() {
 
 // Clear Schedule Action
 function setupClearAll() {
+  const clearModal = document.getElementById('confirm-clear-modal');
+
   document.getElementById('btn-clear').addEventListener('click', () => {
     if (Object.keys(state.selectedSections).length === 0 && Object.keys(state.selectedAssistants).length === 0) return;
-    
-    if (confirm('¿Estás seguro de que quieres limpiar todo tu horario seleccionado y las postulaciones de ayudantías?')) {
-      state.selectedSections = {};
-      state.selectedAssistants = {};
-      updateStats();
-      setStep(1);
+    clearModal.style.display = 'flex';
+    clearModal.classList.add('active');
+  });
+
+  document.getElementById('btn-confirm-clear-cancel').addEventListener('click', () => {
+    clearModal.classList.remove('active');
+    setTimeout(() => { clearModal.style.display = 'none'; }, 200);
+  });
+
+  document.getElementById('btn-confirm-clear-ok').addEventListener('click', () => {
+    clearModal.classList.remove('active');
+    setTimeout(() => { clearModal.style.display = 'none'; }, 200);
+    state.selectedSections = {};
+    state.selectedAssistants = {};
+    saveSchedule();
+    updateStats();
+    renderCalendar();
+    renderCourseList();
+  });
+
+  // Close when clicking outside the card
+  clearModal.addEventListener('click', (e) => {
+    if (e.target === clearModal) {
+      clearModal.classList.remove('active');
+      setTimeout(() => { clearModal.style.display = 'none'; }, 200);
     }
   });
 }

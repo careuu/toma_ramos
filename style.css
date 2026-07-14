@@ -1577,5 +1577,17 @@ body {
   color: #ffffff;
 }
 
+/* Course Semester Tag */
+.course-semester-tag {
+  font-size: 0.7rem;
+  color: var(--primary);
+  background: rgba(224, 142, 121, 0.08);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  border: 1px solid rgba(224, 142, 121, 0.15);
+}
+
+
 
 

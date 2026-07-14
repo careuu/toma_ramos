@@ -210,6 +210,31 @@
     </div>
   </div>
 
+  <!-- Confirm Clear Modal -->
+  <div class="modal-overlay" id="confirm-clear-modal" style="display: none;">
+    <div class="modal-card" style="max-width: 400px;">
+      <div class="modal-header" style="padding-bottom: 0.75rem;">
+        <div class="modal-title-area">
+          <span class="modal-course-code" style="color: var(--accent-rose);">⚠️ Confirmar</span>
+          <h3 class="modal-course-name" style="font-size: 1rem;">¿Limpiar todo el horario?</h3>
+        </div>
+      </div>
+      <div class="modal-divider"></div>
+      <div class="modal-body" style="padding: 1rem 1.5rem;">
+        <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+          Se eliminarán todos los ramos seleccionados y las postulaciones de ayudantías. Esta acción no se puede deshacer.
+        </p>
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+          <button id="btn-confirm-clear-cancel" class="btn btn-secondary">Cancelar</button>
+          <button id="btn-confirm-clear-ok" class="btn btn-danger">
+            <span class="material-symbols-outlined">delete_sweep</span>
+            Limpiar Todo
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- App Script -->
   <script src="courses_data.js" charset="UTF-8"></script>
   <script src="app.js" charset="UTF-8"></script>
