@@ -1267,17 +1267,22 @@ function getBasicSciencesAssistantOptions() {
   return options;
 }
 
-// Check if an assistant option clashes with ANY selected course in Step 1
-// Also checks if the user is currently taking the course in Step 1 (restriction)
+// Check if an assistant option clashes with cátedra events in the selected schedule.
+// Overlapping with ayudantías is ALLOWED (you can be assistant during your own ayudantía hours).
+// Only cátedras (lectures) are a hard restriction.
 function isAssistantClashing(opt) {
   // 1. Cannot be assistant for a course currently selected/taken in Step 1
   if (state.selectedSections[opt.courseCode]) {
     return true;
   }
   
-  // 2. Schedule clash check
+  // 2. Schedule clash check: only block if overlapping with a CÁTEDRA event
   return Object.entries(state.selectedSections).some(([courseCode, selSec]) => {
     return selSec.events.some(selEv => {
+      // Allow overlap with ayudantías — only block cátedras
+      const isCatedra = selEv.type.toUpperCase().includes('CÁTE') || selEv.type.toUpperCase().includes('CATE');
+      if (!isCatedra) return false;
+
       return selEv.times.some(t1 => {
         return opt.event.times.some(t2 => {
           if (t1.day !== t2.day) return false;
@@ -1428,7 +1433,7 @@ function renderAssistantshipList(container, noResults) {
           clashBadge.title = 'Estás cursando esta asignatura este semestre';
         } else {
           clashBadge.innerText = 'Tope';
-          clashBadge.title = 'Topa con tu horario de ramos';
+          clashBadge.title = 'Topa con una cátedra de tu horario';
         }
         cardHeader.appendChild(clashBadge);
       } else {
