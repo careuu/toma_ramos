@@ -18,3 +18,7 @@ Thumbs.db
 *.pdf
 *.xls
 *.xlsx
+
+# Dev scripts (data processing, not needed for the web app)
+*.py
+courses_data.json
