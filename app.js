@@ -1287,21 +1287,27 @@ function getBasicSciencesAssistantOptions() {
   return options;
 }
 
-// Check if an assistant option clashes with cátedra events in the selected schedule.
-// Overlapping with ayudantías is ALLOWED (you can be assistant during your own ayudantía hours).
-// Only cátedras (lectures) are a hard restriction.
+// Check if an assistant option clashes with cátedra or b-learning events in the selected schedule,
+// OR if it overlaps in time with an already-selected assistantship (same block restriction).
+// Overlapping with ayudantías of OTHER courses in the student schedule is ALLOWED.
+// Cátedras AND b-learning are hard restrictions (cannot assist during those blocks).
 function isAssistantClashing(opt) {
   // 1. Cannot be assistant for a course currently selected/taken in Step 1
   if (state.selectedSections[opt.courseCode]) {
     return true;
   }
   
-  // 2. Schedule clash check: only block if overlapping with a CÁTEDRA event
-  return Object.entries(state.selectedSections).some(([courseCode, selSec]) => {
+  // 2. Schedule clash check: block if overlapping with a CÁTEDRA or B-LEARNING event
+  const clashesWithSchedule = Object.entries(state.selectedSections).some(([courseCode, selSec]) => {
     return selSec.events.some(selEv => {
-      // Allow overlap with ayudantías — only block cátedras
-      const isCatedra = selEv.type.toUpperCase().includes('CÁTE') || selEv.type.toUpperCase().includes('CATE');
-      if (!isCatedra) return false;
+      const typeUpper = selEv.type.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      // Block cátedras and b-learning; allow ayudantías
+      const isBlockingType =
+        typeUpper.includes('CATE') ||  // cátedra (with or without accent)
+        typeUpper.includes('B-LEARNING') ||
+        typeUpper.includes('BLEARNING') ||
+        typeUpper.includes('B LEARNING');
+      if (!isBlockingType) return false;
 
       return selEv.times.some(t1 => {
         return opt.event.times.some(t2 => {
@@ -1311,6 +1317,21 @@ function isAssistantClashing(opt) {
       });
     });
   });
+  if (clashesWithSchedule) return true;
+
+  // 3. Cannot select two assistantships in overlapping time blocks.
+  //    If a different assistantship is already selected and its time overlaps, block this one.
+  const clashesWithSelectedAssistant = Object.values(state.selectedAssistants).some(selOpt => {
+    // Skip self (in case the card is already selected and we're re-checking)
+    if (selOpt.id === opt.id) return false;
+    return selOpt.event.times.some(t1 => {
+      return opt.event.times.some(t2 => {
+        if (t1.day !== t2.day) return false;
+        return timeRangesOverlap(t1.start, t1.end, t2.start, t2.end);
+      });
+    });
+  });
+  return clashesWithSelectedAssistant;
 }
 
 // Toggle Assistantship Selection
@@ -1452,8 +1473,23 @@ function renderAssistantshipList(container, noResults) {
           clashBadge.innerText = 'Inscrito';
           clashBadge.title = 'Estás cursando esta asignatura este semestre';
         } else {
-          clashBadge.innerText = 'Tope';
-          clashBadge.title = 'Topa con una cátedra de tu horario';
+          // Determine reason: schedule clash or already-selected assistantship clash
+          const clashesWithSelectedAssistant = Object.values(state.selectedAssistants).some(selOpt => {
+            if (selOpt.id === opt.id) return false;
+            return selOpt.event.times.some(t1 => {
+              return opt.event.times.some(t2 => {
+                if (t1.day !== t2.day) return false;
+                return timeRangesOverlap(t1.start, t1.end, t2.start, t2.end);
+              });
+            });
+          });
+          if (clashesWithSelectedAssistant) {
+            clashBadge.innerText = 'Bloque ocupado';
+            clashBadge.title = 'Ya tienes una ayudantía seleccionada en este bloque horario';
+          } else {
+            clashBadge.innerText = 'Tope';
+            clashBadge.title = 'Topa con una cátedra o b-learning de tu horario';
+          }
         }
         cardHeader.appendChild(clashBadge);
       } else {
