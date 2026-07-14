@@ -25,7 +25,7 @@ const endHour = 23;  // 23:00
 const hourHeight = 60; // 60px per hour (1px = 1 minute)
 const calendarStartMinutes = startHour * 60; // 480 minutes
 
-// Curated Pastel Colors from User Palette (Solid)
+// Curated Pastel Colors from User Palette (Solid) - LIGHT MODE
 const COURSE_COLORS = [
   '#C5E0DC',   // #C5E0DC (Soft Sage / Teal)
   '#ECE5CE',   // #ECE5CE (Pale Cream / Warm White)
@@ -35,6 +35,16 @@ const COURSE_COLORS = [
   '#A79C8E'    // #A79C8E (Warm Taupe / Muted Grey)
 ];
 
+// Pastel Colors for DARK MODE - more vivid/saturated to pop on dark backgrounds
+const COURSE_COLORS_DARK = [
+  '#4DB8B0',   // Vivid Teal
+  '#D4A843',   // Warm Amber / Gold
+  '#E07B5A',   // Deep Coral / Terracotta
+  '#8B7FD4',   // Soft Indigo / Lavender
+  '#5BAD8F',   // Sage Green
+  '#C97AB2'    // Mauve / Orchid
+];
+
 // Utility: Hash course code to select a stable color
 function getCourseColor(courseCode) {
   let hash = 0;
@@ -42,7 +52,8 @@ function getCourseColor(courseCode) {
     hash = courseCode.charCodeAt(i) + ((hash << 5) - hash);
   }
   const idx = Math.abs(hash) % COURSE_COLORS.length;
-  return COURSE_COLORS[idx];
+  const isDark = document.body.classList.contains('dark-mode');
+  return isDark ? COURSE_COLORS_DARK[idx] : COURSE_COLORS[idx];
 }
 
 // Utility: Convert HH:MM time to minutes relative to 00:00
@@ -151,6 +162,11 @@ function initCalendarBg() {
   }
 }
 
+// Utility: Check if dark mode is active
+function isDarkMode() {
+  return document.body.classList.contains('dark-mode');
+}
+
 // Render Calendar Event Blocks
 function renderCalendar() {
   // Clear day columns
@@ -220,7 +236,9 @@ function renderCalendar() {
         day: time.day,
         start: time.start,
         end: time.end,
-        color: opt.assistantType === 'cb' ? '#D4E9F7' : '#E2D9F3',
+        color: isDarkMode()
+          ? (opt.assistantType === 'cb' ? '#1e2f3d' : '#2d2440')
+          : (opt.assistantType === 'cb' ? '#D4E9F7' : '#E2D9F3'),
         isPreview: false,
         isAssistant: true,
         assistantId: opt.id,
@@ -353,7 +371,7 @@ function renderCalendar() {
           const previewBg = event.assistantType === 'cb' ? 'rgba(84, 153, 199, 0.15)' : 'rgba(181, 122, 255, 0.15)';
           div.style.setProperty('--preview-bg-color', previewBg);
           div.style.setProperty('--preview-border-color', event.color);
-          div.style.setProperty('--preview-text-color', '#1f1916');
+          div.style.setProperty('--preview-text-color', isDarkMode() ? '#f0ece8' : '#1f1916');
         } else {
           const r = parseInt(event.color.slice(1, 3), 16);
           const g = parseInt(event.color.slice(3, 5), 16);
@@ -362,17 +380,19 @@ function renderCalendar() {
           
           div.style.setProperty('--preview-bg-color', previewBg);
           div.style.setProperty('--preview-border-color', event.color);
-          div.style.setProperty('--preview-text-color', '#1f1916');
+          div.style.setProperty('--preview-text-color', isDarkMode() ? '#f0ece8' : '#1f1916');
         }
       } else {
+        const textColor = isDarkMode() ? '#f0ece8' : '#110e0c';
+        const borderColor = isDarkMode() ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.2)';
         if (event.isAssistant) {
           div.style.backgroundColor = event.color;
-          div.style.color = '#110e0c';
+          div.style.color = textColor;
           div.style.borderLeft = `4px solid ${event.assistantType === 'cb' ? '#5499C7' : '#b57aff'}`;
         } else {
           div.style.backgroundColor = event.color;
-          div.style.color = '#110e0c'; // Solid dark text for high contrast on pastel backgrounds
-          div.style.borderLeft = '4px solid rgba(0, 0, 0, 0.2)'; // Darker left border accent
+          div.style.color = textColor;
+          div.style.borderLeft = `4px solid ${borderColor}`;
         }
       }
 
@@ -1618,5 +1638,48 @@ function setupModalEvents() {
   });
 }
 
+// ===== DARK MODE LOGIC =====
+function initDarkMode() {
+  const btn = document.getElementById('btn-dark-mode-toggle');
+  const icon = document.getElementById('dark-mode-icon');
+  const savedTheme = localStorage.getItem('toma_ramos_theme');
+
+  function applyDark() {
+    document.body.classList.add('dark-mode');
+    icon.textContent = 'light_mode';
+    btn.title = 'Cambiar a modo claro';
+  }
+
+  function applyLight() {
+    document.body.classList.remove('dark-mode');
+    icon.textContent = 'dark_mode';
+    btn.title = 'Cambiar a modo oscuro';
+  }
+
+  // Restore saved preference or use system preference
+  if (savedTheme === 'dark') {
+    applyDark();
+  } else if (savedTheme === 'light') {
+    applyLight();
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    applyDark();
+  }
+
+  btn.addEventListener('click', () => {
+    if (document.body.classList.contains('dark-mode')) {
+      applyLight();
+      localStorage.setItem('toma_ramos_theme', 'light');
+    } else {
+      applyDark();
+      localStorage.setItem('toma_ramos_theme', 'dark');
+    }
+    // Re-render calendar so course colors update instantly
+    if (typeof renderCalendar === 'function') renderCalendar();
+  });
+}
+
 // Start app on DOM load
-window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('DOMContentLoaded', () => {
+  initDarkMode();
+  init();
+});
